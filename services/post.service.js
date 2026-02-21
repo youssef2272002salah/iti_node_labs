@@ -1,32 +1,52 @@
 const Post = require("../models/post.model");
 
+// Create a new post
 const createPost = async (postData) => {
   return await Post.create(postData);
 };
 
-const getAllPosts = async (page, limit) => {
+// Get all posts with pagination
+const getAllPosts = async (query) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
   const skip = (page - 1) * limit;
+
   const posts = await Post.find({}).skip(skip).limit(limit);
   const total = await Post.countDocuments();
-  return { posts, total };
+
+  return {
+    posts,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };
 
+// Get post by ID
 const getPostById = async (id) => {
-  return await Post.findOne({ _id: id });
+  return await Post.findById(id);
 };
 
-const updatePost = async (id, postData) => {
-  return await Post.findOneAndUpdate({ _id: id }, postData, { new: true });
+// Update post by ID
+const updatePostById = async (id, postData) => {
+  return await Post.findByIdAndUpdate(id, postData, {
+    new: true,
+    runValidators: true,
+  });
 };
 
-const deletePost = async (id) => {
-  return await Post.findOneAndDelete({ _id: id });
+// Delete post by ID
+const deletePostById = async (id) => {
+  return await Post.findByIdAndDelete(id);
 };
 
 module.exports = {
   createPost,
   getAllPosts,
   getPostById,
-  updatePost,
-  deletePost,
+  updatePostById,
+  deletePostById,
 };

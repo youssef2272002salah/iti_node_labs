@@ -1,95 +1,74 @@
 const userService = require("../services/user.service");
-const mongoose = require("mongoose");
+const APIError = require("../utils/APIError");
 
 const createUser = async (req, res) => {
-  const { name, email, password, age } = req.body;
-
-  if (!name || !email || !password || !age) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  const user = await userService.createUser({
-    name,
-    email,
-    password,
-    age,
+  const user = await userService.createUser(req.body);
+  res.status(201).json({
+    message: "User created successfully",
+    success: true,
+    data: user,
   });
-
-  res.status(201).json({ message: "User created successfully", data: user });
 };
 
 const getAllUsers = async (req, res) => {
-  let { page = 1, limit = 10 } = req.query;
-  page = Number(page);
-  limit = Number(limit);
-
-  const { users, total } = await userService.getAllUsers(page, limit);
+  const result = await userService.getAllUsers(req.query);
 
   res.json({
     message: "Users fetched successfully",
-    data: users,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    success: true,
+    data: result.users,
+    pagination: result.pagination,
   });
 };
 
 const getUserById = async (req, res) => {
   const { id } = req.params;
-
-  if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ message: "Invalid user ID" });
-  }
-
   const user = await userService.getUserById(id);
 
   if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    throw new APIError("User not found", 404);
   }
 
-  res.json({ message: "User fetched successfully", data: user });
+  res.json({
+    message: "User fetched successfully",
+    success: true,
+    data: user,
+  });
 };
 
-const updateUser = async (req, res) => {
+const updateUserById = async (req, res) => {
   const { id } = req.params;
-  const { name, email, age } = req.body;
-
-  if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ message: "Invalid user ID" });
-  }
-
-  const updatedUser = await userService.updateUser(id, { name, email, age });
+  const updatedUser = await userService.updateUserById(id, req.body);
 
   if (!updatedUser) {
-    return res.status(404).json({ message: "User not found" });
+    throw new APIError("User not found", 404);
   }
 
-  res.json({ message: "User updated successfully", data: updatedUser });
+  res.json({
+    message: "User updated successfully",
+    success: true,
+    data: updatedUser,
+  });
 };
 
-const deleteUser = async (req, res) => {
+const deleteUserById = async (req, res) => {
   const { id } = req.params;
-
-  if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ message: "Invalid user ID" });
-  }
-
-  const deletedUser = await userService.deleteUser(id);
+  const deletedUser = await userService.deleteUserById(id);
 
   if (!deletedUser) {
-    return res.status(404).json({ message: "User not found" });
+    throw new APIError("User not found", 404);
   }
 
-  res.json({ message: "User deleted successfully" });
+  res.json({
+    message: "User deleted successfully",
+    success: true,
+  });
 };
 
 module.exports = {
   createUser,
   getAllUsers,
   getUserById,
-  updateUser,
-  deleteUser,
+  updateUserById,
+  deleteUserById,
 };
