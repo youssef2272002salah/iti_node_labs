@@ -1,12 +1,23 @@
 const userService = require("../services/user.service");
 const APIError = require("../utils/APIError");
 
-const createUser = async (req, res) => {
-  const user = await userService.createUser(req.body);
+const signUp = async (req, res) => {
+  const user = await userService.signUp(req.body);
   res.status(201).json({
     message: "User created successfully",
     success: true,
     data: user,
+  });
+};
+
+const signIn = async (req, res) => {
+  const { email, password } = req.body;
+  const result = await userService.signIn(email, password);
+
+  res.status(200).json({
+    message: "User signed in successfully",
+    success: true,
+    data: result,
   });
 };
 
@@ -66,7 +77,8 @@ const deleteUserById = async (req, res) => {
 };
 
 module.exports = {
-  createUser,
+  signUp,
+  signIn,
   getAllUsers,
   getUserById,
   updateUserById,
