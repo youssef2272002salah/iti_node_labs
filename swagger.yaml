@@ -1,68 +1,243 @@
 openapi: 3.0.0
 info:
   title: Users and Posts API
-  version: 1.0.0
-  description: API for managing users and posts
+  version: 2.0.0
+  description: API for managing users and posts with authentication and authorization
 
 servers:
   - url: http://localhost:3000
     description: Development server
 
 tags:
+  - name: Authentication
+    description: User authentication endpoints (sign-up, sign-in)
   - name: Users
-    description: User management endpoints
+    description: User management endpoints (admin only)
   - name: Posts
-    description: Post management endpoints
+    description: Post management endpoints (requires authentication)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from sign-in endpoint
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          example: john@example.com
+        role:
+          type: string
+          enum: [user, admin]
+          example: user
+        age:
+          type: number
+          example: 25
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Post:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        title:
+          type: string
+          example: My First Post
+        content:
+          type: string
+          example: This is the content of my post
+        author:
+          type: string
+          example: John Doe
+        userId:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+        isOwner:
+          type: boolean
+          description: Whether the authenticated user is the post owner
+          example: true
+        tags:
+          type: array
+          items:
+            type: string
+          example: [javascript, nodejs]
+        published:
+          type: boolean
+          example: true
+        likes:
+          type: number
+          example: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT token for authentication
+            user:
+              $ref: '#/components/schemas/User'
+
+    SignUpRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 30
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 30
+          example: SecurePass123
+        repeatPassword:
+          type: string
+          minLength: 8
+          maxLength: 30
+          example: SecurePass123
+        age:
+          type: number
+          minimum: 18
+          maximum: 150
+          example: 25
+      required:
+        - name
+        - email
+        - password
+        - repeatPassword
+        - age
+
+    SignInRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 30
+          example: SecurePass123
+      required:
+        - email
+        - password
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        success:
+          type: boolean
 
 paths:
-  /users:
+  /users/sign-up:
     post:
-      summary: Create a new user
+      summary: Sign up a new user
       tags:
-        - Users
+        - Authentication
+      description: Create a new user account with sign-up
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: John Doe
-                email:
-                  type: string
-                  example: john@example.com
-                password:
-                  type: string
-                  example: password123
-                age:
-                  type: number
-                  example: 25
-              required:
-                - name
-                - email
-                - password
-                - age
+              $ref: '#/components/schemas/SignUpRequest'
       responses:
         '201':
           description: User created successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  data:
-                    type: object
+                $ref: '#/components/schemas/AuthResponse'
         '400':
-          description: Missing required fields
+          description: Invalid input or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: User with this email already exists
+                success: false
 
+  /users/sign-in:
+    post:
+      summary: Sign in with email and password
+      tags:
+        - Authentication
+      description: Authenticate user and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: User signed in successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Invalid email or password
+                success: false
+
+  /users:
     get:
       summary: Get all users with pagination
       tags:
         - Users
+      description: Retrieve all users (admin only)
+      security:
+        - BearerAuth: []
       parameters:
         - in: query
           name: page
@@ -86,28 +261,61 @@ paths:
                 properties:
                   message:
                     type: string
+                  success:
+                    type: boolean
                   data:
                     type: array
+                    items:
+                      $ref: '#/components/schemas/User'
                   pagination:
                     type: object
+                    properties:
+                      page:
+                        type: number
+                      limit:
+                        type: number
+                      total:
+                        type: number
+                      totalPages:
+                        type: number
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - admin role required
 
   /users/{id}:
     get:
       summary: Get a user by ID
       tags:
         - Users
+      description: Retrieve a specific user (admin only)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
-          description: User ID
+          description: User ID (MongoDB ObjectId)
       responses:
         '200':
           description: User fetched successfully
-        '400':
-          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - admin role required
         '404':
           description: User not found
 
@@ -115,12 +323,16 @@ paths:
       summary: Update a user by ID
       tags:
         - Users
+      description: Update user information (admin only)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+          description: User ID
       requestBody:
         required: true
         content:
@@ -130,15 +342,31 @@ paths:
               properties:
                 name:
                   type: string
+                  example: Jane Doe
                 email:
                   type: string
+                  example: jane@example.com
                 age:
                   type: number
+                  example: 26
       responses:
         '200':
           description: User updated successfully
-        '400':
-          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - admin role required
         '404':
           description: User not found
 
@@ -146,17 +374,32 @@ paths:
       summary: Delete a user by ID
       tags:
         - Users
+      description: Delete a user (admin only)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+          description: User ID
       responses:
         '200':
           description: User deleted successfully
-        '400':
-          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - admin role required
         '404':
           description: User not found
 
@@ -165,6 +408,9 @@ paths:
       summary: Create a new post
       tags:
         - Posts
+      description: Create a post (requires authentication)
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -196,13 +442,29 @@ paths:
       responses:
         '201':
           description: Post created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Post'
         '400':
           description: Missing required fields
+        '401':
+          description: Unauthorized - missing or invalid token
 
     get:
       summary: Get all posts with pagination
       tags:
         - Posts
+      description: Retrieve all posts with ownership information (requires authentication)
+      security:
+        - BearerAuth: []
       parameters:
         - in: query
           name: page
@@ -219,12 +481,41 @@ paths:
       responses:
         '200':
           description: Posts fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: number
+                      limit:
+                        type: number
+                      total:
+                        type: number
+                      totalPages:
+                        type: number
+        '401':
+          description: Unauthorized - missing or invalid token
 
   /posts/{id}:
     get:
       summary: Get a post by ID
       tags:
         - Posts
+      description: Retrieve a specific post with ownership information (requires authentication)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
@@ -235,8 +526,19 @@ paths:
       responses:
         '200':
           description: Post fetched successfully
-        '400':
-          description: Invalid post ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '401':
+          description: Unauthorized - missing or invalid token
         '404':
           description: Post not found
 
@@ -244,12 +546,16 @@ paths:
       summary: Update a post by ID
       tags:
         - Posts
+      description: Update a post (requires authentication and ownership)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+          description: Post ID
       requestBody:
         required: true
         content:
@@ -259,21 +565,39 @@ paths:
               properties:
                 title:
                   type: string
+                  example: Updated Post Title
                 content:
                   type: string
+                  example: Updated post content
                 author:
                   type: string
+                  example: John Doe
                 tags:
                   type: array
                   items:
                     type: string
+                  example: [javascript, nodejs, express]
                 published:
                   type: boolean
+                  example: true
       responses:
         '200':
           description: Post updated successfully
-        '400':
-          description: Invalid post ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - only post owner can update
         '404':
           description: Post not found
 
@@ -281,16 +605,31 @@ paths:
       summary: Delete a post by ID
       tags:
         - Posts
+      description: Delete a post (requires authentication and ownership)
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+          description: Post ID
       responses:
         '200':
           description: Post deleted successfully
-        '400':
-          description: Invalid post ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized - missing or invalid token
+        '403':
+          description: Forbidden - only post owner can delete
         '404':
           description: Post not found
